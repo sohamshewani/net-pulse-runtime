@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.netpulse</groupId>
+    <artifactId>net-pulse-runtime</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>net-pulse-runtime</name>
+    <description>Production-grade runtime with native C/C++ integration</description>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <native.src.dir>${project.basedir}/src/main/native</native.src.dir>
+        <native.build.dir>${project.build.directory}/native</native.build.dir>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+
+            <!-- AntRun Plugin to safely handle custom targets: all, build, test, clean, benchmark -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <!-- CLEAN TARGET -->
+                    <execution>
+                        <id>custom-clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <echo message="Executing custom clean target..."/>
+                                <delete dir="${project.build.directory}" quiet="true"/>
+                                <delete dir="${native.build.dir}" quiet="true"/>
+                            </target>
+                        </configuration>
+                    </execution>
+
+                    <!-- BUILD TARGET -->
+                    <execution>
+                        <id>custom-build</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <echo message="Executing custom build target..."/>
+                                <mkdir dir="${native.build.dir}"/>
+                                <available file="${native.src.dir}" type="dir" property="native.exists"/>
+                                <antcall target="compile-native"/>
+                            </target>
+                        </configuration>
+                    </execution>
+
+                    <!-- TEST TARGET -->
+                    <execution>
+                        <id>custom-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <echo message="Executing custom test target..."/>
+                                <available file="${project.basedir}/src/test" type="dir" property="test.exists"/>
+                                <antcall target="run-tests"/>
+                            </target>
+                        </configuration>
+                    </execution>
+
+                    <!-- BENCHMARK TARGET -->
+                    <execution>
+                        <id>custom-benchmark</id>
+                        <phase>integration-test</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <echo message="Executing custom benchmark target..."/>
+                                <available file="${project.basedir}/src/benchmark" type="dir" property="bench.exists"/>
+                                <antcall target="run-benchmarks"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+
+                <configuration>
+                    <exportAntProperties>true</exportAntProperties>
+                    <target>
+                        <target name="compile-native">
+                            <echo message="Checking for C/C++ source directory: ${native.src.dir}"/>
+                            <sequential if:set="native.exists" xmlns:if="ant:if">
+                                <echo message="Compiling C/C++ sources with -O3, -Wall, -Wextra..."/>
+                                <!-- Generic GCC/Clang compilation example safely handled -->
+                                <exec executable="g++" failonerror="false" resultproperty="compilation.result">
+                                    <arg line="-O3 -Wall -Wextra -shared -fPIC"/>
+                                    <arg line="-o ${native.build.dir}/libnetpulse.so"/>
+                                    <arg line="${native.src.dir}/net_pulse.cpp"/>
+                                </exec>
+                                <echo message="Native compilation finished."/>
+                            </sequential>
+                            <sequential unless:set="native.exists" xmlns:unless="ant:unless">
+                                <echo message="Optional folder '${native.src.dir}' missing. Skipping native build gracefully."/>
+                            </sequential>
+                        </target>
+
+                        <target name="run-tests">
+                            <echo message="Checking test execution prerequisites..."/>
+                            <sequential if:set="test.exists" xmlns:if="ant:if">
+                                <echo message="Test directory exists. Surefire will process tests normally during lifecycle."/>
+                            </sequential>
+                            <sequential unless:set="test.exists" xmlns:unless="ant:unless">
+                                <echo message="Optional folder 'src/test' missing. Skipping tests gracefully."/>
+                            </sequential>
+                        </target>
+
+                        <
